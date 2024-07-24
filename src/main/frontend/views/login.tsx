@@ -9,7 +9,7 @@ export const config: ViewConfig = {
 
 const loginI18n: LoginI18n = {
   ...new LoginOverlayElement().i18n,
-  header: { title: 'Hilla Auth Starter', description: 'Login using user/user or admin/admin' },
+  header: { title: 'Gemba AI Platform', description: 'Please contact an administrator for login details.' },
 };
 
 export default function LoginView() {

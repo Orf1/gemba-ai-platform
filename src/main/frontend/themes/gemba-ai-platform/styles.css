@@ -1,3 +1,4 @@
+@import "theme-editor.css";
 @import url('./views/home-view.css');
 @import url('./views/database-view.css');    html {
       --lumo-primary-text-color: hsl(214, 100%, 50%);

@@ -1,6 +1,7 @@
 package dev.orf1.gembaaiplatform;
 
 import com.vaadin.flow.component.page.AppShellConfigurator;
+import com.vaadin.flow.component.page.Push;
 import com.vaadin.flow.theme.Theme;
 import dev.orf1.gembaaiplatform.data.UserRepository;
 import javax.sql.DataSource;
@@ -19,6 +20,7 @@ import org.springframework.context.annotation.Bean;
  */
 @SpringBootApplication
 @Theme(value = "gemba-ai-platform")
+@Push
 public class Application implements AppShellConfigurator {
 
     public static void main(String[] args) {

@@ -24,7 +24,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 
 import com.vaadin.flow.component.progressbar.ProgressBar;
 
@@ -35,6 +35,7 @@ import com.vaadin.flow.component.progressbar.ProgressBar;
 @PermitAll
 public class HomeView extends Composite<VerticalLayout> {
     MessageList messageList = new MessageList();
+    TextArea customInstructions = new TextArea();
 
     private final OpenAIService openAIService;
     private final List<ChatMessage> messageHistory = new ArrayList<>();
@@ -78,34 +79,61 @@ public class HomeView extends Composite<VerticalLayout> {
             addUserMessage(submitEvent.getValue());
 
             java.lang.Thread.ofVirtual().name("aiprocess").start(() -> {
-                getUI().ifPresentOrElse(ui -> ui.access(() -> {
-                    CreateRunRequest createRunRequest = CreateRunRequest.newBuilder()
-                            .assistantId(openAIService.getAssistant().id())
-                            .instructions("Please address the user as Jane Doe. The user has a premium account.")
-                            .build();
+                CreateRunRequest createRunRequest = CreateRunRequest.newBuilder()
+                        .assistantId(openAIService.getAssistant().id())
+                        .stream(true)
+                        .build();
 
-                    ThreadRun run = openAIService.getRunsClient().createRun(thread.id(), createRunRequest);
+                AtomicReference<MessageListItem> lastMessage = new AtomicReference<>(addAIMessage(""));
+                List<MessageListItem> currentItems = new ArrayList<>(messageList.getItems());
 
-                    ThreadRun retrievedRun = openAIService.getRunsClient().retrieveRun(thread.id(), run.id());
-                    while (!retrievedRun.status().equals("completed")) {
-                        try {
-                            java.lang.Thread.sleep(1000);
-                            System.out.println("Status:" + retrievedRun.status());
-                            retrievedRun = openAIService.getRunsClient().retrieveRun(thread.id(), run.id());
-                        } catch (InterruptedException e) {
-                            e.printStackTrace();
-                        }
+                openAIService.getRunsClient().createRunAndStream(thread.id(), createRunRequest, new AssistantStreamEventSubscriber() {
+                    @Override
+                    public void onThread(String event, Thread thread) {}
+
+                    @Override
+                    public void onThreadRun(String event, ThreadRun threadRun) {}
+
+                    @Override
+                    public void onThreadRunStep(String event, ThreadRunStep threadRunStep) {}
+
+                    @Override
+                    public void onThreadRunStepDelta(String event, ThreadRunStepDelta threadRunStepDelta) {}
+
+                    @Override
+                    public void onThreadMessage(String event, ThreadMessage threadMessage) {}
+
+                    @Override
+                    public void onThreadMessageDelta(String event, ThreadMessageDelta threadMessageDelta) {
+                        getUI().ifPresent(ui -> ui.access(() -> lastMessage.updateAndGet(message -> {
+                            for (ThreadMessageDelta.Delta.Content content : threadMessageDelta.delta().content()) {
+                                if (content instanceof ThreadMessageDelta.Delta.Content.TextContent textContent) {
+                                    message.setText(message.getText() + textContent.text().value());
+                                }
+                            }
+
+                            messageList.setItems(currentItems);
+                            return message;
+                        })));
                     }
 
-                    MessagesClient.PaginatedThreadMessages paginatedMessages = openAIService.getMessagesClient().listMessages(thread.id(), PaginationQueryParameters.none(), Optional.empty());
-                    List<ThreadMessage> messages = paginatedMessages.data();
-                    messages.getFirst().content().forEach(content -> {
-                        addAIMessage(content.toString());
-                    });
 
-                    messageInput.setEnabled(true);
-                    progressbar.setVisible(false);
-                }), () -> System.out.println("Could not get UI!"));
+                    @Override
+                    public void onUnknownEvent(String event, String data) {}
+
+                    @Override
+                    public void onException(Throwable ex) {
+                        ex.printStackTrace();
+                    }
+
+                    @Override
+                    public void onComplete() {
+                        getUI().ifPresent(ui -> ui.access(() -> {
+                            messageInput.setEnabled(true);
+                            progressbar.setVisible(false);
+                        }));
+                    }
+                });
             });
         });
 
@@ -128,10 +156,9 @@ public class HomeView extends Composite<VerticalLayout> {
         select.setItems("GPT-4 Full", "GPT-4 Mini");
         select.setValue("GPT-4 Full");
 
-        TextArea textArea = new TextArea();
-        textArea.setLabel("Custom Instructions");
-        textArea.setWidth("100%");
-        textArea.setPlaceholder("How would you like the AI to respond?");
+        customInstructions.setLabel("Custom Instructions");
+        customInstructions.setWidth("100%");
+        customInstructions.setPlaceholder("How would you like the AI to respond?");
 
         Button buttonPrimary = new Button();
         buttonPrimary.setText("Save");
@@ -140,7 +167,7 @@ public class HomeView extends Composite<VerticalLayout> {
 
         rightColumn.add(h2);
         rightColumn.add(select);
-        rightColumn.add(textArea);
+        rightColumn.add(customInstructions);
         rightColumn.add(buttonPrimary);
 
         // Combined
@@ -151,7 +178,7 @@ public class HomeView extends Composite<VerticalLayout> {
 
     private Thread createThread() {
         CreateThreadRequest.Message message = CreateThreadRequest.Message.newBuilder()
-                .role(Role.USER)
+                .role(Role.ASSISTANT)
                 .content("Hi! How can I help?")
                 .build();
         CreateThreadRequest createThreadRequest = CreateThreadRequest.newBuilder()
@@ -160,7 +187,7 @@ public class HomeView extends Composite<VerticalLayout> {
         return openAIService.getThreadsClient().createThread(createThreadRequest);
     }
 
-    public void addUserMessage(String text) {
+    public MessageListItem addUserMessage(String text) {
         MessageListItem message = new MessageListItem(text);
         message.setUserName("You");
         message.setUserAbbreviation("Y");
@@ -176,9 +203,11 @@ public class HomeView extends Composite<VerticalLayout> {
                 .content(text)
                 .build();
 
-        openAIService.getMessagesClient().createMessage(thread.id(), createMessageRequest);    }
+        openAIService.getMessagesClient().createMessage(thread.id(), createMessageRequest);
+        return message;
+    }
 
-    public void addAIMessage(String text) {
+    public MessageListItem addAIMessage(String text) {
         MessageListItem message = new MessageListItem(text);
         message.setUserName("Gemba AI System");
         message.setUserAbbreviation("AI");
@@ -188,13 +217,7 @@ public class HomeView extends Composite<VerticalLayout> {
         currentItems.add(message);
 
         messageList.setItems(currentItems);
-//
-//        CreateMessageRequest createMessageRequest = CreateMessageRequest.newBuilder()
-//                .role(Role.ASSISTANT)
-//                .content(text)
-//                .build();
-//
-//        openAIService.getMessagesClient().createMessage(thread.id(), createMessageRequest);
+        return message;
     }
 
     private void resetMessageList() {

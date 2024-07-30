@@ -1,5 +1,5 @@
-insert into application_user (version, id, username,name,hashed_password,profile_picture) values (1, '1','user','John Normal','$2a$10$xdbKoM48VySZqVSU/cSlVeJn0Z04XCZ7KZBjUBC00eKo5uLswyOpe',x'')
+insert into application_user (version, id, username,name,hashed_password,profile_picture) values (1, '1','gemba','John Normal','$2a$10$nDOshl3XZOBFtb9oDXave.xvv.CfgMIADwDdW2DC0SKVyJODr3Bu2',x'')
 insert into user_roles (user_id, roles) values ('1', 'USER')
-insert into application_user (version, id, username,name,hashed_password,profile_picture) values (1, '2','admin','John Admin','$2a$10$jpLNVNeA7Ar/ZQ2DKbKCm.MuT2ESe.Qop96jipKMq7RaUgCoQedV.',x'')
+insert into application_user (version, id, username,name,hashed_password,profile_picture) values (1, '2','admin','John Admin','$2a$10$mtkcYhL1DFX5XLCmW3UoseNo9UvvwitCcTXJqmwhvU8VuuKPz8u0i',x'')
 insert into user_roles (user_id, roles) values ('2', 'USER')
 insert into user_roles (user_id, roles) values ('2', 'ADMIN')

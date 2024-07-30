@@ -1,0 +1,1 @@
+docker pull orf1/gemba-ai-platform:latest && docker stop gemba-ai-platform && docker rm gemba-ai-platform && docker run -d --name gemba-ai-platform -p 80:8080 orf1/gemba-ai-platform:latest
